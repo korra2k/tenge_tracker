@@ -1,0 +1,15 @@
+{
+  "name": "tenge-tracker-demo-seed",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "emulators": "firebase emulators:start --only auth,firestore",
+    "seed:demo": "node scripts/seed-demo-accounts.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  },
+  "devDependencies": {
+    "firebase-tools": "^14.0.0"
+  }
+}

@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owns(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.admin == true
+        || request.auth.token.email == 'admin123@gmail.com'
+      );
+    }
+
+    match /users/{userId} {
+      allow get: if owns(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if owns(userId)
+        && request.resource.data.uid == userId
+        && (
+          request.resource.data.role == 'user'
+          || (request.auth.token.email == 'admin123@gmail.com' && request.resource.data.role == 'admin')
+        )
+        && request.resource.data.status == 'active'
+        && request.resource.data.plan == 'free';
+      allow update: if isAdmin() || (owns(userId)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.plan == resource.data.plan
+        && request.resource.data.createdAt == resource.data.createdAt);
+      allow delete: if false;
+
+      match /transactions/{transactionId} {
+        allow read, delete: if owns(userId);
+        allow create, update: if owns(userId)
+          && request.resource.data.amount is number
+          && request.resource.data.amount > 0
+          && request.resource.data.type in ['income', 'expense']
+          && request.resource.data.date is string
+          && request.resource.data.category is string
+          && request.resource.data.account is string
+          && exists(/databases/$(database)/documents/users/$(userId)/accounts/$(request.resource.data.account));
+      }
+
+      match /accounts/{accountId} {
+        allow read, delete: if owns(userId);
+        allow create, update: if owns(userId)
+          && request.resource.data.name is string
+          && request.resource.data.type is string
+          && request.resource.data.currency in ['KZT', 'RUB', 'USD', 'EUR']
+          && request.resource.data.balance is number;
+      }
+
+      match /budgets/{budgetId} {
+        allow read, delete: if owns(userId);
+        allow create, update: if owns(userId)
+          && request.resource.data.category is string
+          && request.resource.data.limit is number
+          && request.resource.data.limit > 0
+          && request.resource.data.period in ['week', 'month']
+          && request.resource.data.currency in ['KZT', 'RUB', 'USD', 'EUR'];
+      }
+
+      match /goals/{goalId} {
+        allow read, delete: if owns(userId);
+        allow create, update: if owns(userId)
+          && request.resource.data.name is string
+          && request.resource.data.targetAmount is number
+          && request.resource.data.targetAmount > 0
+          && request.resource.data.savedAmount is number
+          && request.resource.data.dueDate is string
+          && request.resource.data.currency in ['KZT', 'RUB', 'USD', 'EUR'];
+      }
+
+      match /categories/{categoryId} {
+        allow read, delete: if owns(userId);
+        allow create, update: if owns(userId)
+          && request.resource.data.name is string
+          && request.resource.data.type in ['income', 'expense']
+          && request.resource.data.color is string
+          && request.resource.data.icon is string;
+      }
+    }
+
+    match /globalCategories/{categoryId} {
+      allow read: if request.auth != null;
+      allow create, update: if isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.type in ['income', 'expense']
+        && request.resource.data.color is string
+        && request.resource.data.icon is string;
+      allow delete: if isAdmin();
+    }
+
+    match /plans/{planId} {
+      allow read: if request.auth != null;
+      allow create, update: if isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.price is number
+        && request.resource.data.currency in ['KZT', 'RUB', 'USD', 'EUR'];
+      allow delete: if isAdmin();
+    }
+
+    match /adminAudit/{auditId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+  }
+}
